@@ -1,12 +1,14 @@
 using System.Threading;
 using System.Threading.Tasks;
 using dotnet_graphql_test.Data;
+using dotnet_graphql_test.GraphQL.ObjAuthn;
 using dotnet_graphql_test.GraphQL.ObjJob;
 using dotnet_graphql_test.GraphQL.ObjPerson;
 using dotnet_graphql_test.Model;
 using HotChocolate;
 using HotChocolate.Data;
 using HotChocolate.Subscriptions;
+using Microsoft.AspNetCore.Http;
 
 namespace dotnet_graphql_test.GraphQL
 {
@@ -46,6 +48,21 @@ namespace dotnet_graphql_test.GraphQL
             await eventSender.SendAsync(nameof(Subscription.OnJobAdded), job, cancellationToken);
 
             return new AddJobPayload(job);
+        }
+
+        [UseDbContext(typeof(AppDbContext))]
+        public async Task<RegisterPayload> RegisterAsync(RegisterInput input, [ScopedService] AppDbContext ctx, [Service]IHttpContextAccessor httpContextAccessor)
+        {
+            var user = new User
+            {
+                Username=input.Username,
+                Password=input.Password
+            };
+
+            ctx.Users.Add(user);
+            await ctx.SaveChangesAsync();
+            httpContextAccessor.HttpContext.Session.SetInt32("uid",user.Id);
+            return new RegisterPayload(user);
         }
     }
 }

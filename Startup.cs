@@ -4,14 +4,19 @@ using System.Linq;
 using System.Threading.Tasks;
 using dotnet_graphql_test.Data;
 using dotnet_graphql_test.GraphQL;
+using dotnet_graphql_test.GraphQL.ObjAuthn;
 using dotnet_graphql_test.GraphQL.ObjPerson;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.AuthenticatedEncryption.ConfigurationModel;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.DataProtection.AuthenticatedEncryption;
+using System.IO;
 
 namespace dotnet_graphql_test
 {
@@ -28,9 +33,21 @@ namespace dotnet_graphql_test
         // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddPooledDbContextFactory<AppDbContext>(options => 
-                options.UseNpgsql(Configuration.GetConnectionString("Database"))
-            );
+            services.AddPooledDbContextFactory<AppDbContext>(options =>
+            {
+                options.UseNpgsql(Configuration.GetConnectionString("Database"));    
+            });
+            services.AddDataProtection()
+                .PersistKeysToFileSystem(new DirectoryInfo("./secret/"));
+            services.AddDistributedMemoryCache();
+            services.AddSession(options =>
+            {
+                options.IdleTimeout = TimeSpan.FromHours(1);
+                options.Cookie.HttpOnly = true;
+                options.Cookie.IsEssential = true;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.Name = "sid";
+            });
             services.AddGraphQLServer()
                     .AddQueryType<Query>()
                     .AddMutationType<Mutation>()
@@ -39,6 +56,7 @@ namespace dotnet_graphql_test
                     .AddFiltering()
                     .AddSorting()
                     .AddInMemorySubscriptions();
+            services.AddHttpContextAccessor();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -48,16 +66,13 @@ namespace dotnet_graphql_test
             {
                 app.UseDeveloperExceptionPage();
             }
-
-            app.UseWebSockets();
+        
             app.UseRouting();
+            app.UseWebSockets();
+            app.UseSession();
 
             app.UseEndpoints(endpoints =>
             {
-                endpoints.MapGet("/", async context =>
-                {
-                    await context.Response.WriteAsync("Hello World!");
-                });
                 endpoints.MapGraphQL();
             });
         }

@@ -12,5 +12,6 @@ namespace dotnet_graphql_test.Data
 
         public DbSet<Person> Persons {get;set;}
         public DbSet<Job> Jobs{get;set;}
+        public DbSet<User> Users{get;set;}
     }
 }
